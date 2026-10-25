@@ -51,7 +51,7 @@ Preview serves the built app at http://127.0.0.1:4173/commute-map/. Browser test
 
 ## Data and dependencies
 
-React, TypeScript, Vite, Leaflet, and locally bundled DM Sans / Manrope fonts. OpenStreetMap standard tiles use visible attribution, normal browser caching, and no prefetch/offline downloads: https://operations.osmfoundation.org/policies/tiles/.
+React, TypeScript, Vite, Leaflet, and locally bundled DM Sans / Manrope fonts. Font copyright notices and OFL licenses are included in [public/licenses](public/licenses). OpenStreetMap standard tiles use visible attribution, normal browser caching, and no prefetch/offline downloads: https://operations.osmfoundation.org/policies/tiles/.
 
 Saved addresses and notes remain under the versioned `hemvag:v1` localStorage key on this origin. Clearing browser site data removes them. Private browsing, blocked storage, or browser limits can prevent saving; the interface warns and remains usable. GitHub Pages projects on the same origin share browser storage security boundaries; do not treat this as a secure vault.
 
@@ -64,3 +64,9 @@ Repository: https://github.com/aronsai/commute-map
 GitHub Pages uses **GitHub Actions**, configured in `.github/workflows/pages.yml`. Vite's base path is `/commute-map/`. There are no nested page routes or server rewrites. The workflow checks pull requests and pushes to `main` with type checking, unit tests, a production build, and mocked desktop/mobile browser tests. Only a successful `main` run uploads `dist/` and deploys it through official Pages actions. No deployment secrets are required.
 
 To deploy a change, open a PR, pass checks, merge to `main`, then inspect the **Check and deploy** workflow and the live site. Verify assets, refresh, map tiles, an SL query, and local persistence. To roll back, revert the faulty commit on `main`; the same workflow redeploys the restored app. Saved browser settings are independent of deployments; preserve the storage format or add a migration before changing it.
+
+## Verified release
+
+On 25 October 2026, the production build and type checks passed, along with 14 unit tests and eight desktop/mobile Chromium scenarios. The GitHub Actions check and Pages deployment both succeeded.
+
+The deployed site was checked in Chromium using public Stockholm landmarks: live address search, two transit commutes, a five-minute daycare stop, walking-only comparisons, rendered map tiles and route geometry, and saved settings/shortlist after reload. No browser errors or failed HTTP responses occurred. The browser test data was isolated to the test browser and is not preloaded in the app.
