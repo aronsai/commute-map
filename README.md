@@ -7,12 +7,12 @@ Live site: **https://aronsai.github.io/commute-map/**
 ## Use
 
 1. Select both workplaces from address search (or choose map pins / enter coordinates), and set each person's arrival deadline.
-2. Optionally enable dog daycare, choose its location, assign the drop-off, and set its duration.
-3. Add apartments with an address or pin, optional listing URL, and notes.
+2. Add any dog daycares you want to compare, using address search, coordinates, or map pins. Choose the shared drop-off person and duration.
+3. Add apartments with an address or pin, optional listing URL, and notes. Select a saved daycare or “No daycare” for each apartment, in its card or editor. New apartments default to no daycare. Deleting a daycare clears its assignments after confirmation.
 4. Choose a date within SL's timetable window and a travel mode, then calculate. Click a person's result for the itinerary and map route. On mobile, use the Map tab.
 5. Results preserve the order added. Sort explicitly by either person's travel time if desired. Refresh bypasses cached results; Cancel stops pending calculations. Changing route inputs hides obsolete results until recalculated.
 
-The next available weekday, 09:00 arrivals, public transit, and a five-minute drop-off are defaults. Daycare starts disabled. No personal or example locations are preloaded.
+The next available weekday, 09:00 arrivals, public transit, and a five-minute drop-off are defaults. No daycares are preloaded. No personal or example locations are preloaded.
 
 ## Local development
 
@@ -29,14 +29,14 @@ Open the printed URL at `/commute-map/`.
 npm run typecheck
 npm test
 npm run build
-npx playwright install chromium
+npx playwright install chromium firefox
 npm run test:e2e
 # Optional, contacts SL using only public test locations:
 npm run test:live
 npm run preview -- --port 4173
 ```
 
-Preview serves the built app at http://127.0.0.1:4173/commute-map/. Browser tests build on the production output, mock SL and map tiles, and cover desktop and mobile Chromium. Run `npm run build` before them. CI installs Chromium's OS dependencies too. Tests do not require live SL access.
+Preview serves the built app at http://127.0.0.1:4173/commute-map/. Browser tests build on the production output, mock SL and map tiles, and cover desktop Chromium, desktop Firefox, and mobile Chromium. Run `npm run build` before them. CI installs both browsers’ OS dependencies too. Tests do not require live SL access.
 
 ## Routing and limitations
 
@@ -53,7 +53,7 @@ Preview serves the built app at http://127.0.0.1:4173/commute-map/. Browser test
 
 React, TypeScript, Vite, Leaflet, and locally bundled DM Sans / Manrope fonts. Font copyright notices and OFL licenses are included in [public/licenses](public/licenses). OpenStreetMap standard tiles use visible attribution, normal browser caching, and no prefetch/offline downloads: https://operations.osmfoundation.org/policies/tiles/.
 
-Saved addresses and notes remain under the versioned `hemvag:v1` localStorage key on this origin. Clearing browser site data removes them. Private browsing, blocked storage, or browser limits can prevent saving; the interface warns and remains usable. GitHub Pages projects on the same origin share browser storage security boundaries; do not treat this as a secure vault.
+Saved addresses and notes remain under the `hemvag:v1` localStorage key on this origin. The payload is version 2; existing version 1 data migrates automatically, preserving the old daycare and assigning it to existing apartments only if drop-off was enabled. Clearing browser site data removes them. Private browsing, blocked storage, or browser limits can prevent saving; the interface warns and remains usable. GitHub Pages projects on the same origin share browser storage security boundaries; do not treat this as a secure vault.
 
 SL receives address searches and route coordinates. OpenStreetMap receives map requests. GitHub hosts the public app. Opening a listing sends you to that site. No entered locations are committed, added to share URLs, logged, or included in built artifacts. Booli links do not fetch or import listing details.
 
@@ -65,8 +65,12 @@ GitHub Pages uses **GitHub Actions**, configured in `.github/workflows/pages.yml
 
 To deploy a change, open a PR, pass checks, merge to `main`, then inspect the **Check and deploy** workflow and the live site. Verify assets, refresh, map tiles, an SL query, and local persistence. To roll back, revert the faulty commit on `main`; the same workflow redeploys the restored app. Saved browser settings are independent of deployments; preserve the storage format or add a migration before changing it.
 
-## Verified release
+## Previous release verification
 
 On 25 October 2026, the production build and type checks passed, along with 14 unit tests and eight desktop/mobile Chromium scenarios. The GitHub Actions check and Pages deployment both succeeded.
 
 The deployed site was checked in Chromium using public Stockholm landmarks: live address search, two transit commutes, a five-minute daycare stop, walking-only comparisons, rendered map tiles and route geometry, and saved settings/shortlist after reload. No browser errors or failed HTTP responses occurred. The browser test data was isolated to the test browser and is not preloaded in the app.
+
+## Interface and map rendering
+
+The workspace opens directly to controls and results, with only functional overlays on the map. Tiles use their original colors without a pane-wide CSS filter, and markers use box shadows instead of filter effects to reduce Firefox rendering overhead. Unrelated UI updates do not rebuild map markers. Automated browser checks cover map panning, zooming, pins, and route selection; perceived smoothness still depends on the browser and graphics hardware.

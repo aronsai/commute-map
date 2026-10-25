@@ -101,8 +101,10 @@ async function setup(page: Page, daycare = false) {
   await selectLocation(page, "Partner workplace", "Partner Work");
   await page.getByLabel("Commute date", { exact: true }).fill("2026-10-26");
   if (daycare) {
-    await page.getByRole("checkbox", { name: "A stop for the dog" }).check();
-    await selectLocation(page, "Dog daycare", "Daycare");
+    await page
+      .getByRole("button", { name: "Add daycare", exact: true })
+      .click();
+    await selectLocation(page, "Dog daycare 1", "Daycare");
   }
 }
 async function addApartment(
@@ -129,6 +131,17 @@ async function addApartment(
       .getByRole("button", { name: "Set location", exact: true })
       .click();
   } else await selectLocation(page, "Apartment address", "Apartment Street");
+  if (
+    (await page
+      .getByRole("dialog")
+      .getByLabel("Dog daycare", { exact: true })
+      .locator("option")
+      .count()) > 1
+  )
+    await page
+      .getByRole("dialog")
+      .getByLabel("Dog daycare", { exact: true })
+      .selectOption({ index: 1 });
   await page
     .getByRole("button", { name: "Add to shortlist", exact: true })
     .click();
@@ -141,6 +154,9 @@ test("setup, CRUD, storage, routing, walking, sorting, stale results and route d
   await mockSL(page);
   await setup(page, true);
   await addApartment(page);
+  await expect(
+    page.getByLabel("Daycare for Södermalm home", { exact: true }),
+  ).not.toHaveValue("");
   await page.getByRole("button", { name: "Edit Södermalm home" }).click();
   await page.getByLabel("Notes optional").fill("Viewing Sunday");
   await page.getByLabel("Listing URL optional").fill("javascript:alert(1)");
@@ -277,4 +293,143 @@ test("storage denial stays usable and no route geometry remains honest", async (
     await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.getByText("SL did not provide map geometry")).toBeVisible();
   await expect(page.locator(".leaflet-overlay-pane path")).toHaveCount(0);
+});
+
+test("multiple daycares, per-apartment selection, edit, deletion and map navigation", async ({
+  page,
+}, info) => {
+  await mockSL(page);
+  await setup(page, true);
+  await page.getByRole("button", { name: "Add daycare", exact: true }).click();
+  await selectLocation(page, "Dog daycare 2", "Second Daycare");
+  await addApartment(page);
+  await page
+    .getByLabel("Daycare for Södermalm home", { exact: true })
+    .selectOption({ index: 2 });
+  await addApartment(page, "Direct home");
+  await page
+    .getByLabel("Daycare for Direct home", { exact: true })
+    .selectOption("");
+  await selectLocation(page, "Dog daycare 2", "Edited Daycare");
+  await page.reload();
+  await expect(
+    page
+      .getByLabel("Daycare for Södermalm home", { exact: true })
+      .locator("option:checked"),
+  ).toHaveText("Edited Daycare, Stockholm");
+  await page
+    .getByRole("button", { name: "Calculate commutes", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Show You route for Södermalm home" }),
+  ).toContainText("1h 9m");
+  await expect(
+    page.getByRole("button", { name: "Show You route for Direct home" }),
+  ).toContainText("32 min");
+  await page
+    .getByLabel("Daycare for Södermalm home", { exact: true })
+    .selectOption({ index: 1 });
+  await expect(page.getByText("Settings changed.")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Delete daycare 1", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Remove daycare", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Daycare for Södermalm home", { exact: true }),
+  ).toHaveValue("");
+  if (info.project.name === "mobile")
+    await page.getByRole("button", { name: "Map", exact: true }).click();
+  const map = page.locator(".leaflet-map");
+  const box = (await map.boundingBox())!;
+  const pane = page.locator(".leaflet-map-pane");
+  const before = await pane.getAttribute("style");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    box.x + box.width / 2 + 90,
+    box.y + box.height / 2 + 60,
+    { steps: 12 },
+  );
+  await page.mouse.up();
+  await expect(pane).not.toHaveAttribute("style", before!);
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await expect(
+    page.locator(".topbar, .intro, .map-title, .map-onboarding"),
+  ).toHaveCount(0);
+  await expect(page.locator(".leaflet-tile-pane")).toHaveCSS("filter", "none");
+});
+
+test("legacy browser data migrates and daycare map pins persist", async ({
+  page,
+}, info) => {
+  await mockSL(page);
+  await page.addInitScript(() => {
+    if (localStorage.getItem("hemvag:v1")) return;
+    const location = { label: "Saved place", lat: 59.33, lng: 18.06 };
+    localStorage.setItem(
+      "hemvag:v1",
+      JSON.stringify({
+        version: 1,
+        settings: {
+          people: [
+            { id: "you", name: "You", work: location, arrival: "09:00" },
+            {
+              id: "partner",
+              name: "Partner",
+              work: location,
+              arrival: "09:00",
+            },
+          ],
+          date: "2026-10-26",
+          mode: "transit",
+          daycare: { enabled: true, location, personId: "you", minutes: 5 },
+        },
+        apartments: [
+          {
+            id: "saved-home",
+            label: "Saved home",
+            location,
+            notes: "Saved note",
+            url: "",
+          },
+        ],
+      }),
+    );
+  });
+  await page.goto("");
+  await expect(
+    page.getByLabel("Daycare for Saved home", { exact: true }),
+  ).toHaveValue("migrated-daycare");
+  await expect(page.getByText("Saved note", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Add apartment", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog").getByLabel("Dog daycare", { exact: true }),
+  ).toHaveValue("");
+  await page.getByRole("button", { name: "Close apartment editor" }).click();
+  await page
+    .locator(".daycare-entry")
+    .getByRole("button", { name: "Choose on map" })
+    .click();
+  await page
+    .locator(".leaflet-map")
+    .click({
+      position: { x: info.project.name === "mobile" ? 200 : 460, y: 300 },
+    });
+  await page.getByRole("button", { name: "Use location", exact: true }).click();
+  await expect(page.getByLabel("Dog daycare 1", { exact: true })).toHaveValue(
+    /Map pin/,
+  );
+  await page.reload();
+  await expect(page.getByLabel("Dog daycare 1", { exact: true })).toHaveValue(
+    /Map pin/,
+  );
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem("hemvag:v1")!).version,
+    ),
+  ).toBe(2);
 });

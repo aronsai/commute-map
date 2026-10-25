@@ -48,6 +48,7 @@ const emptyDraft = () => ({
   location: null as Location | null,
   url: "",
   notes: "",
+  daycareId: null as string | null,
 });
 function fingerprint(state: SavedState) {
   return JSON.stringify({
@@ -55,6 +56,7 @@ function fingerprint(state: SavedState) {
     apartments: state.apartments.map((a) => ({
       id: a.id,
       location: a.location,
+      daycareId: a.daycareId,
     })),
   });
 }
@@ -78,6 +80,7 @@ export default function App() {
   const [draftError, setDraftError] = useState("");
   const [pickTarget, setPickTarget] = useState<string | null>(null);
   const [pendingPin, setPendingPin] = useState<Location | null>(null);
+  const [deleteDaycareId, setDeleteDaycareId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
   const runId = useRef(0);
@@ -185,10 +188,12 @@ export default function App() {
   function onPick(location: Location) {
     setPendingPin(null);
     if (pickTarget === "draft") setDraft((d) => ({ ...d, location }));
-    else if (pickTarget === "daycare")
+    else if (pickTarget?.startsWith("daycare:"))
       updateSettings({
         ...settings,
-        daycare: { ...settings.daycare, location },
+        daycares: settings.daycares.map((d) =>
+          d.id === pickTarget?.slice(8) ? { ...d, location } : d,
+        ),
       });
     else {
       const index = settings.people.findIndex((p) => p.id === pickTarget);
@@ -199,7 +204,11 @@ export default function App() {
   }
   function openEditor(apartment?: Apartment) {
     previousFocus.current = document.activeElement as HTMLElement;
-    setDraft(apartment ?? emptyDraft());
+    setDraft(
+      apartment
+        ? { ...apartment, daycareId: apartment.daycareId ?? null }
+        : emptyDraft(),
+    );
     setDraftError("");
     setEditor(true);
     setPickTarget(null);
@@ -244,8 +253,16 @@ export default function App() {
       setSettingsOpen(true);
       return;
     }
-    if (settings.daycare.enabled && !settings.daycare.location) {
-      setError("Choose a daycare location or turn off drop-off.");
+    if (
+      state.apartments.some(
+        (a) =>
+          a.daycareId &&
+          !settings.daycares.find((d) => d.id === a.daycareId)?.location,
+      )
+    ) {
+      setError(
+        "Choose a location for each assigned daycare or select No daycare.",
+      );
       return;
     }
     if (!range) {
@@ -296,6 +313,7 @@ export default function App() {
             settings,
             job.deadline,
             c.signal,
+            job.a.daycareId,
           );
           if (runId.current === id && !c.signal.aborted)
             setResults((r) => ({
@@ -328,42 +346,11 @@ export default function App() {
   const ordered = sortedApartments(state.apartments, sort, displayResults);
   return (
     <div className="app-shell">
-      <header className="topbar" inert={editor && !pickTarget}>
-        <a href="#" className="brand" aria-label="Hemväg home">
-          <span className="brand-icon">
-            <House size={21} />
-          </span>
-          <span>
-            hemväg<span className="brand-dot">.</span>
-          </span>
-        </a>
-        <div className="topbar-description">
-          A better way home
-          <span className="header-divider" />
-          Stockholm commute planner
-        </div>
-        <span className="city-badge">
-          <span />
-          STOCKHOLM, SE
-        </span>
-      </header>
       <main
         className={`workspace mobile-${mobile}`}
         inert={editor && !pickTarget}
       >
         <aside className="sidebar">
-          <section className="intro">
-            <div className="eyebrow">LESS COMMUTING. MORE LIVING.</div>
-            <h1>
-              Find your kind
-              <br />
-              of close.
-            </h1>
-            <p>
-              Two workplaces. One dog. A home that
-              <br className="desktop-break" /> works for your everyday.
-            </p>
-          </section>
           <section className="settings-section" aria-label="Commute settings">
             <button
               type="button"
@@ -373,7 +360,7 @@ export default function App() {
             >
               <span>
                 <Settings2 size={17} />
-                Your everyday
+                Commute settings
               </span>
               <ChevronDown
                 size={17}
@@ -421,41 +408,90 @@ export default function App() {
                   </div>
                 ))}
                 <div className="daycare-settings">
-                  <label className="daycare-toggle">
+                  <div className="section-heading">
                     <span>
-                      <Dog size={18} />A stop for the dog
+                      <Dog size={18} /> Dog daycares
                     </span>
-                    <input
-                      type="checkbox"
-                      checked={settings.daycare.enabled}
-                      onChange={(e) =>
+                    <button
+                      className="text-button"
+                      onClick={() =>
                         updateSettings({
                           ...settings,
-                          daycare: {
-                            ...settings.daycare,
-                            enabled: e.target.checked,
-                          },
+                          daycares: [
+                            ...settings.daycares,
+                            { id: crypto.randomUUID(), location: null },
+                          ],
                         })
                       }
-                    />
-                    <span className="toggle-track" aria-hidden="true" />
-                  </label>
-                  <p className="muted daycare-description">
-                    Include daycare on the way to work.
-                  </p>
-                  {settings.daycare.enabled && (
-                    <div className="daycare-expanded">
+                    >
+                      <Plus size={14} /> Add daycare
+                    </button>
+                  </div>
+                  {settings.daycares.map((d, i) => (
+                    <div key={d.id} className="daycare-entry">
                       <LocationField
-                        label="Dog daycare"
-                        value={settings.daycare.location}
+                        label={`Dog daycare ${i + 1}`}
+                        value={d.location}
                         onChange={(location) =>
                           updateSettings({
                             ...settings,
-                            daycare: { ...settings.daycare, location },
+                            daycares: settings.daycares.map((v) =>
+                              v.id === d.id ? { ...v, location } : v,
+                            ),
                           })
                         }
-                        onPick={() => pick("daycare")}
+                        onPick={() => pick(`daycare:${d.id}`)}
                       />
+                      <button
+                        className="text-button danger"
+                        onClick={() => setDeleteDaycareId(d.id)}
+                      >
+                        Delete daycare {i + 1}
+                      </button>
+                      {deleteDaycareId === d.id && (
+                        <div className="delete-confirm">
+                          <span>
+                            Remove daycare and clear its apartment assignments?
+                          </span>
+                          <button
+                            className="text-button danger"
+                            onClick={() => {
+                              setState((s) => ({
+                                ...s,
+                                settings: {
+                                  ...s.settings,
+                                  daycares: s.settings.daycares.filter(
+                                    (v) => v.id !== d.id,
+                                  ),
+                                },
+                                apartments: s.apartments.map((a) =>
+                                  a.daycareId === d.id
+                                    ? { ...a, daycareId: null }
+                                    : a,
+                                ),
+                              }));
+                              setDraft((v) =>
+                                v.daycareId === d.id
+                                  ? { ...v, daycareId: null }
+                                  : v,
+                              );
+                              setDeleteDaycareId(null);
+                            }}
+                          >
+                            Remove daycare
+                          </button>
+                          <button
+                            className="text-button"
+                            onClick={() => setDeleteDaycareId(null)}
+                          >
+                            Keep daycare
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {settings.daycares.length > 0 && (
+                    <div className="daycare-expanded">
                       <div className="form-row">
                         <label>
                           Who drops off?
@@ -678,6 +714,19 @@ export default function App() {
                       </button>
                     </div>
                   )}
+                  <DaycareSelect
+                    settings={settings}
+                    value={a.daycareId}
+                    label={`Daycare for ${a.label}`}
+                    onChange={(daycareId) =>
+                      setState((s) => ({
+                        ...s,
+                        apartments: s.apartments.map((v) =>
+                          v.id === a.id ? { ...v, daycareId } : v,
+                        ),
+                      }))
+                    }
+                  />
                   <div className="commute-grid">
                     {settings.people.map((p, i) => {
                       const key = resultKey(a.id, p.id),
@@ -692,7 +741,7 @@ export default function App() {
                           <span className="commute-name">
                             <span className={`tiny-dot dot-${i}`} />
                             {p.name}
-                            {settings.daycare.enabled &&
+                            {a.daycareId &&
                               settings.daycare.personId === p.id && (
                                 <Dog size={12} aria-label="Via daycare" />
                               )}
@@ -751,16 +800,6 @@ export default function App() {
             </div>
             {!state.apartments.length && (
               <div className="empty-state">
-                <span className="empty-icon">
-                  <House size={27} />
-                  <span>+</span>
-                </span>
-                <h2>Your next home starts here</h2>
-                <p>
-                  Add an apartment you’re considering.
-                  <br />
-                  We’ll help you see how the everyday fits.
-                </p>
                 <button
                   className="button secondary"
                   onClick={() => openEditor()}
@@ -768,9 +807,6 @@ export default function App() {
                   <Plus size={15} />
                   Add your first apartment
                 </button>
-                <span className="empty-footnote">
-                  Found something on Booli? Save its address here.
-                </span>
               </div>
             )}
           </section>
@@ -823,9 +859,6 @@ export default function App() {
                 {storageWarning}
               </p>
             )}
-            <div className="footer-wordmark">
-              Made for the life between places.
-            </div>
           </footer>
         </aside>
         <section className="map-panel" aria-label="Map and selected route">
@@ -841,15 +874,6 @@ export default function App() {
               setSelected(resultKey(id, settings.people[0].id));
             }}
           />
-          <div className="map-title">
-            <span className="map-title-icon">
-              <MapPin size={17} />
-            </span>
-            <div>
-              <strong>Your everyday, mapped</strong>
-              <span>Stockholm & surroundings</span>
-            </div>
-          </div>
           <div className="map-legend">
             <span>
               <i className="legend-dot home-dot" />
@@ -871,7 +895,7 @@ export default function App() {
                 {pendingPin ? "Pin placed for " : "Click the map to set "}
                 {pickTarget === "draft"
                   ? "the apartment"
-                  : pickTarget === "daycare"
+                  : pickTarget?.startsWith("daycare:")
                     ? "daycare"
                     : "the workplace"}
                 .
@@ -899,20 +923,6 @@ export default function App() {
               >
                 <X size={17} />
               </button>
-            </div>
-          )}
-          {!state.apartments.length && !pickTarget && (
-            <div className="map-onboarding">
-              <span className="onboarding-icon">
-                <Route size={23} />
-              </span>
-              <div>
-                <strong>
-                  A little less “how far?”
-                  <br />A little more “how long?”
-                </strong>
-                <p>Add your places to see the bigger picture.</p>
-              </div>
             </div>
           )}
           {selectedJourney && (
@@ -974,9 +984,8 @@ export default function App() {
           >
             <div className="editor-heading">
               <div>
-                <div className="eyebrow">MAKE ROOM FOR POSSIBILITIES</div>
                 <h2 id="editor-title">
-                  {draft.id ? "Edit apartment" : "A place to call home?"}
+                  {draft.id ? "Edit apartment" : "Add apartment"}
                 </h2>
               </div>
               <button
@@ -1009,6 +1018,11 @@ export default function App() {
                 value={draft.location}
                 onChange={(location) => setDraft((d) => ({ ...d, location }))}
                 onPick={() => pick("draft")}
+              />
+              <DaycareSelect
+                settings={settings}
+                value={draft.daycareId}
+                onChange={(daycareId) => setDraft((d) => ({ ...d, daycareId }))}
               />
               <label>
                 Listing URL <span className="optional">optional</span>
@@ -1125,5 +1139,35 @@ function JourneyDetails({
         </p>
       )}
     </section>
+  );
+}
+
+function DaycareSelect({
+  settings,
+  value,
+  onChange,
+  label = "Dog daycare",
+}: {
+  settings: Settings;
+  value?: string | null;
+  onChange: (id: string | null) => void;
+  label?: string;
+}) {
+  return (
+    <label className="daycare-select">
+      {label}
+      <select
+        aria-label={label}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+      >
+        <option value="">No daycare</option>
+        {settings.daycares.map((d, i) => (
+          <option key={d.id} value={d.id}>
+            {d.location?.label ?? `Daycare ${i + 1} (choose location)`}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

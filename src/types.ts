@@ -17,20 +17,20 @@ export interface Apartment {
   location: Location;
   url: string;
   notes: string;
+  daycareId?: string | null;
 }
 export interface Settings {
   people: Person[];
   date: string;
   mode: Mode;
+  daycares: { id: string; location: Location | null }[];
   daycare: {
-    enabled: boolean;
-    location: Location | null;
     personId: string;
     minutes: number;
   };
 }
 export interface SavedState {
-  version: 1;
+  version: 2;
   settings: Settings;
   apartments: Apartment[];
 }

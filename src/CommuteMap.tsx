@@ -84,30 +84,21 @@ export default function CommuteMap(props: Props) {
           `${p.name}: ${p.work.label}`,
         );
     });
-    if (props.settings.daycare.enabled && props.settings.daycare.location)
-      marker(
-        props.settings.daycare.location,
-        "D",
-        "daycare",
-        `Daycare: ${props.settings.daycare.location.label}`,
-      );
+    props.settings.daycares.forEach((d) => {
+      if (d.location)
+        marker(d.location, "D", "daycare", `Daycare: ${d.location.label}`);
+    });
     props.apartments.forEach((a, i) =>
       marker(
         a.location,
         String(i + 1),
         `home ${props.selectedApartment === a.id ? "selected" : ""}`,
         a.label,
-        () => props.onSelect(a.id),
+        () => latest.current.onSelect(a.id),
       ),
     );
     if (props.draft) marker(props.draft, "+", "draft", props.draft.label);
-  }, [
-    props.settings,
-    props.apartments,
-    props.selectedApartment,
-    props.draft,
-    props.onSelect,
-  ]);
+  }, [props.settings, props.apartments, props.selectedApartment, props.draft]);
   useEffect(() => {
     const group = routeLayer.current;
     if (!group) return;

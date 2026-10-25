@@ -167,7 +167,7 @@ button svg {
 .workspace {
   display: grid;
   grid-template-columns: 430px minmax(0, 1fr);
-  height: calc(100dvh - 76px);
+  height: 100dvh;
 }
 .sidebar {
   overflow: auto;
@@ -898,9 +898,6 @@ progress {
   font-family: "DM Sans Variable", sans-serif;
   background: #dae7df;
 }
-.leaflet-tile-pane {
-  filter: saturate(0.65) contrast(0.96);
-}
 .leaflet-control-attribution {
   font-size: 9px !important;
   background: #fafcf3dd !important;
@@ -1028,7 +1025,6 @@ progress {
 .map-pin {
   background: none !important;
   border: 0 !important;
-  filter: drop-shadow(0 3px 4px #17382130);
 }
 .map-pin:before {
   content: "";
@@ -1039,6 +1035,7 @@ progress {
   height: 34px;
   background: #38583b;
   border: 3px solid white;
+  box-shadow: 0 3px 4px #17382130;
   border-radius: 50% 50% 50% 4px;
   transform: rotate(-45deg);
 }
@@ -1372,7 +1369,7 @@ progress {
   }
   .workspace {
     display: block;
-    height: calc(100dvh - 122px);
+    height: calc(100dvh - 58px);
   }
   .sidebar {
     height: 100%;
@@ -1397,7 +1394,7 @@ progress {
   .mobile-list .map-panel {
     visibility: hidden;
     position: absolute;
-    inset: 64px 0 58px;
+    inset: 0 0 58px;
     pointer-events: none;
   }
   .mobile-map .sidebar {
@@ -1592,12 +1589,63 @@ body,
 }
 
 /* Keep supporting text readable against the warm paper backgrounds. */
-.topbar-description,.intro p,.location-field>label,.location-help,.coordinates,.muted,
-.date-row>label,.empty-state p,.empty-footnote,.sidebar-footer,.footer-wordmark,
-.apartment-heading p,.commute-cell .timing-label,.sort-row,.apartment-notes,
-.map-title span:not(.map-title-icon),.map-legend>span,.map-onboarding p,
-.journey-meta,.journey-meta>span,.journey-legs li>div p,
-.journey-legs li>span:last-child,.optional,.geometry-note,.arrival-input { color:#626f59; }
-.eyebrow { color:#5f7048; }
-input::placeholder,textarea::placeholder { color:#65725e; }
-.map-pin.work-a span,.map-pin.work-b span,.map-pin.daycare span { color:#14281d; }
+.topbar-description,
+.intro p,
+.location-field > label,
+.location-help,
+.coordinates,
+.muted,
+.date-row > label,
+.empty-state p,
+.empty-footnote,
+.sidebar-footer,
+.footer-wordmark,
+.apartment-heading p,
+.commute-cell .timing-label,
+.sort-row,
+.apartment-notes,
+.map-title span:not(.map-title-icon),
+.map-legend > span,
+.map-onboarding p,
+.journey-meta,
+.journey-meta > span,
+.journey-legs li > div p,
+.journey-legs li > span:last-child,
+.optional,
+.geometry-note,
+.arrival-input {
+  color: #626f59;
+}
+.eyebrow {
+  color: #5f7048;
+}
+input::placeholder,
+textarea::placeholder {
+  color: #65725e;
+}
+.map-pin.work-a span,
+.map-pin.work-b span,
+.map-pin.daycare span {
+  color: #14281d;
+}
+
+.map-legend {
+  top: 16px;
+  left: 16px;
+  right: auto;
+}
+.pick-banner {
+  top: 68px;
+}
+.editor-picking {
+  padding-top: 16px;
+}
+.editor-picking .editor-panel {
+  max-height: calc(100dvh - 32px);
+}
+.daycare-entry {
+  margin: 14px 0;
+}
+.daycare-select {
+  margin-top: 12px;
+}

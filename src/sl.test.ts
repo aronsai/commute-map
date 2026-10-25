@@ -165,9 +165,10 @@ describe("daycare chaining", () => {
   it("works backwards, includes drop-off and waiting, and only affects assigned person", async () => {
     const settings = initialState().settings;
     settings.people.forEach((p) => (p.work = place));
+    settings.daycares = [
+      { id: "test-daycare", location: { ...place, label: "Daycare" } },
+    ];
     settings.daycare = {
-      enabled: true,
-      location: { ...place, label: "Daycare" },
       personId: "you",
       minutes: 5,
     };
@@ -185,6 +186,8 @@ describe("daycare chaining", () => {
       settings.people[0],
       settings,
       deadline,
+      undefined,
+      "test-daycare",
     );
     expect(client.journey.mock.calls[1][0].deadline).toBe(
       second.departure - 300000,
@@ -204,15 +207,16 @@ describe("daycare chaining", () => {
       settings.people[1],
       settings,
       deadline,
+      undefined,
+      "test-daycare",
     );
     expect(client.journey).toHaveBeenCalledTimes(1);
   });
   it("rejects connections that do not allow drop-off time", async () => {
     const settings = initialState().settings;
     settings.people[0].work = place;
+    settings.daycares = [{ id: "test-daycare", location: place }];
     settings.daycare = {
-      enabled: true,
-      location: place,
       personId: "you",
       minutes: 5,
     };
@@ -223,7 +227,15 @@ describe("daycare chaining", () => {
         .mockResolvedValueOnce(journey(deadline - 1800000, deadline - 1200000)),
     };
     await expect(
-      calculateCommute(client, place, settings.people[0], settings, deadline),
+      calculateCommute(
+        client,
+        place,
+        settings.people[0],
+        settings,
+        deadline,
+        undefined,
+        "test-daycare",
+      ),
     ).rejects.toThrow("enough time");
   });
 });
@@ -358,5 +370,79 @@ describe("local state and timezone", () => {
         key === storageKey ? JSON.stringify(state) : null,
     });
     expect(loadState().state).toEqual(state);
+  });
+});
+
+describe("daycare persistence migration", () => {
+  for (const enabled of [true, false]) {
+    it(`preserves legacy settings with daycare enabled=${enabled}`, () => {
+      const current = initialState();
+      const legacy = {
+        ...current,
+        version: 1,
+        settings: {
+          ...current.settings,
+          daycare: { ...current.settings.daycare, enabled, location: place },
+        },
+        apartments: [
+          {
+            id: "home",
+            label: "Home",
+            location: place,
+            notes: "Keep notes",
+            url: "",
+          },
+        ],
+      };
+      vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(legacy) });
+      const loaded = loadState();
+      expect(loaded.warning).toBe("");
+      expect(loaded.state.version).toBe(2);
+      expect(loaded.state.settings.daycares).toEqual([
+        { id: "migrated-daycare", location: place },
+      ]);
+      expect(loaded.state.apartments[0]).toMatchObject({
+        notes: "Keep notes",
+        daycareId: enabled ? "migrated-daycare" : null,
+      });
+    });
+  }
+  it("routes through the selected daycare and supports no daycare", async () => {
+    const settings = initialState().settings;
+    settings.people[0].work = place;
+    const other = { ...place, lat: 59.4, label: "Second daycare" };
+    settings.daycares = [
+      { id: "first", location: place },
+      { id: "second", location: other },
+    ];
+    const client = {
+      journey: vi
+        .fn()
+        .mockResolvedValueOnce(journey(deadline - 1200000, deadline))
+        .mockResolvedValueOnce(journey(deadline - 3000000, deadline - 1800000)),
+    };
+    await calculateCommute(
+      client,
+      place,
+      settings.people[0],
+      settings,
+      deadline,
+      undefined,
+      "second",
+    );
+    expect(client.journey.mock.calls[0][0].origin).toEqual(other);
+    expect(client.journey.mock.calls[1][0].destination).toEqual(other);
+    client.journey
+      .mockReset()
+      .mockResolvedValue(journey(deadline - 1200000, deadline));
+    await calculateCommute(
+      client,
+      place,
+      settings.people[0],
+      settings,
+      deadline,
+    );
+    expect(client.journey).toHaveBeenCalledTimes(1);
+    expect(client.journey.mock.calls[0][0].destination).toEqual(place);
   });
 });

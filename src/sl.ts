@@ -348,10 +348,14 @@ export async function calculateCommute(
   settings: Settings,
   deadline: number,
   signal?: AbortSignal,
+  daycareId?: string | null,
 ): Promise<Journey> {
   if (!person.work) throw new Error("Choose a workplace first.");
-  const daycare = settings.daycare;
-  if (!daycare.enabled || daycare.personId !== person.id)
+  const daycare = {
+    ...settings.daycare,
+    location: settings.daycares.find((d) => d.id === daycareId)?.location,
+  };
+  if (!daycareId || daycare.personId !== person.id)
     return client.journey(
       { origin: home, destination: person.work, deadline, mode: settings.mode },
       signal,

@@ -3,7 +3,7 @@ import { resultKey } from "./types";
 import { nextWeekday } from "./time";
 export const storageKey = "hemvag:v1";
 export const initialState = (): SavedState => ({
-  version: 1,
+  version: 2,
   apartments: [],
   settings: {
     people: [
@@ -12,7 +12,8 @@ export const initialState = (): SavedState => ({
     ],
     date: nextWeekday(),
     mode: "transit",
-    daycare: { enabled: false, location: null, personId: "you", minutes: 5 },
+    daycares: [],
+    daycare: { personId: "you", minutes: 5 },
   },
 });
 function validLocation(v: unknown): boolean {
@@ -33,9 +34,30 @@ export function loadState(): { state: SavedState; warning: string } {
   try {
     const raw = localStorage.getItem(storageKey);
     if (!raw) return { state: initialState(), warning: "" };
-    const s = JSON.parse(raw) as SavedState;
+    const legacy = JSON.parse(raw);
     if (
-      s.version !== 1 ||
+      legacy.version === 1 &&
+      legacy.settings?.daycare &&
+      Array.isArray(legacy.apartments)
+    ) {
+      const old = legacy.settings.daycare;
+      const id = "migrated-daycare";
+      legacy.settings.daycares = old.location
+        ? [{ id, location: old.location }]
+        : [];
+      legacy.apartments = legacy.apartments.map((a: Apartment) => ({
+        ...a,
+        daycareId: old.enabled && old.location ? id : null,
+      }));
+      legacy.settings.daycare = {
+        personId: old.personId,
+        minutes: old.minutes,
+      };
+      legacy.version = 2;
+    }
+    const s = legacy as SavedState;
+    if (
+      s.version !== 2 ||
       !s.settings ||
       !Array.isArray(s.apartments) ||
       !Array.isArray(s.settings.people) ||
@@ -58,12 +80,18 @@ export function loadState(): { state: SavedState; warning: string } {
       throw Error();
     if (
       !c.daycare ||
-      typeof c.daycare.enabled !== "boolean" ||
+      !Array.isArray(c.daycares) ||
+      !c.daycares.every(
+        (d) =>
+          typeof d.id === "string" &&
+          !!d.id &&
+          (d.location === null || validLocation(d.location)),
+      ) ||
+      new Set(c.daycares.map((d) => d.id)).size !== c.daycares.length ||
       !c.people.some((p) => p.id === c.daycare.personId) ||
       !Number.isInteger(c.daycare.minutes) ||
       c.daycare.minutes < 0 ||
-      c.daycare.minutes > 120 ||
-      (c.daycare.location !== null && !validLocation(c.daycare.location))
+      c.daycare.minutes > 120
     )
       throw Error();
     if (
@@ -73,7 +101,8 @@ export function loadState(): { state: SavedState; warning: string } {
           typeof a.label === "string" &&
           typeof a.url === "string" &&
           typeof a.notes === "string" &&
-          validLocation(a.location),
+          validLocation(a.location) &&
+          (a.daycareId == null || c.daycares.some((d) => d.id === a.daycareId)),
       ) ||
       new Set(s.apartments.map((a) => a.id)).size !== s.apartments.length
     )

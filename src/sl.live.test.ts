@@ -46,9 +46,8 @@ it.skipIf(!process.env.SL_LIVE)(
     const settings = initialState().settings;
     settings.date = date;
     settings.people[0].work = work;
+    settings.daycares = [{ id: "test-daycare", location: daycare }];
     settings.daycare = {
-      enabled: true,
-      location: daycare,
       personId: "you",
       minutes: 5,
     };
@@ -58,6 +57,8 @@ it.skipIf(!process.env.SL_LIVE)(
       settings.people[0],
       settings,
       deadline,
+      undefined,
+      "test-daycare",
     );
     expect(via.arrival).toBeLessThanOrEqual(deadline);
     const dropoff = via.legs.find((l) => l.mode === "dropoff")!;
